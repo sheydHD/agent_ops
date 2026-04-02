@@ -33,7 +33,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         # --- Resolve or generate request ID ---
-        rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:16]
+        raw_rid = request.headers.get("x-request-id") or ""
+        # Sanitize: allow only alphanumeric, hyphens, and underscores to prevent log injection
+        rid = raw_rid[:64] if raw_rid and all(c.isalnum() or c in "-_" for c in raw_rid) else uuid.uuid4().hex[:16]
         token = request_id_ctx.set(rid)
 
         method = request.method
