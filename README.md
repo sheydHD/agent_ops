@@ -103,6 +103,17 @@ A single OpenTelemetry `TracerProvider` with two OTLP exporters sends identical 
 
 Every response includes direct links to its trace in both dashboards.
 
+### Automated Scoring & Evaluation
+
+Each request is automatically scored:
+
+- **Retrieval quality** (RAG path): measures how many relevant docs were retrieved
+- **Routing confidence** (General path): validates the routing decision
+- **Response completeness**: answer length heuristic
+- **Faithfulness** (RAG path): LLM-as-judge background evaluation that checks if the answer is faithful to the retrieved context
+
+Users can also submit thumbs-up/down feedback from the chat UI, which is recorded as a Langfuse score.
+
 ### Prompt Management
 
 Prompts can be managed in the Langfuse UI and selected from the chat interface dropdown. The backend fetches prompt templates via the Langfuse SDK at query time.
@@ -138,6 +149,7 @@ agent_ops/
 ## Available Commands
 
 ```bash
+# Services
 make up                # Start all services (dev mode)
 make down              # Stop all services
 make logs              # Follow all logs
@@ -149,6 +161,20 @@ make restart-backend   # Restart backend only
 make restart-frontend  # Restart frontend only
 make restart-apps      # Restart backend + frontend
 make clean             # Remove all volumes (full reset)
+
+# Code Quality
+make lint              # Run all linters (backend + frontend)
+make format            # Format all code (backend + frontend)
+make typecheck         # Run all type checks (mypy + tsc)
+make check             # Run all checks (lint + format + typecheck) — CI equivalent
+
+# Testing
+make test              # Run all tests
+make test-backend      # Run backend tests only
+
+# Pre-commit
+make pre-commit-install # Install pre-commit hooks
+make pre-commit         # Run pre-commit on all files
 ```
 
 ## API Endpoints
@@ -156,6 +182,8 @@ make clean             # Remove all volumes (full reset)
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/chat` | Send a message, receive RAG-augmented response |
+| `POST` | `/api/feedback` | Submit thumbs-up / thumbs-down for a trace |
+| `POST` | `/api/admin/dataset` | Add a trace to a Langfuse evaluation dataset |
 | `GET` | `/api/prompts` | List available Langfuse-managed prompts |
 | `GET` | `/health` | Service health check (Ollama, ChromaDB, Langfuse, Phoenix) |
 | `GET` | `/docs` | Interactive API documentation (Swagger UI) |
@@ -171,19 +199,38 @@ make clean             # Remove all volumes (full reset)
 }
 ```
 
-Response includes the answer, source documents, routing metadata, token metrics, and direct trace URLs.
+Response includes the answer, source documents, routing metadata, token metrics, per-document relevance scores, and direct trace URLs.
+
+### `POST /api/feedback`
+
+```json
+{
+  "trace_id": "abc123...",
+  "sentiment": "positive",
+  "comment": "optional comment"
+}
+```
+
+Records user feedback as a Langfuse score on the trace.
 
 ## Running Tests
 
 ```bash
-# Backend tests
+# Backend tests (from project root)
+make test-backend
+
+# Or manually:
 cd apps/backend
 pip install -r requirements-dev.txt
 pytest tests/ -v
 
-# Frontend (lint)
+# Frontend (lint + typecheck)
 cd apps/frontend
 pnpm lint
+pnpm typecheck
+
+# Run all code quality checks at once
+make check
 ```
 
 ## Configuration
@@ -200,6 +247,8 @@ Key settings:
 | `LANGFUSE_PUBLIC_KEY` | — | From Langfuse project settings |
 | `LANGFUSE_SECRET_KEY` | — | From Langfuse project settings |
 | `PHOENIX_ENABLED` | `true` | Enable/disable Phoenix |
+| `FAITHFULNESS_EVAL_ENABLED` | `true` | Enable LLM-as-judge faithfulness evaluation |
+| `LANGFUSE_DATASET_NAME` | `agentops-demo` | Default dataset name for evaluation items |
 | `LOG_LEVEL` | `INFO` | Logging verbosity |
 | `LOG_FORMAT` | `text` | `text` for dev, `json` for production |
 

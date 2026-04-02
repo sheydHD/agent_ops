@@ -2,13 +2,15 @@
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel, Field
 
 from src.agents.rag_agent import ask
 from src.config.logging_config import conversation_id_ctx
+from src.config.settings import settings
+from src.services.evaluation import evaluate_faithfulness
 from src.services.telemetry import annotate_phoenix_trace, score_trace
 
 logger = logging.getLogger("agentops.api.chat")
@@ -19,6 +21,7 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 # ---------------------------------------------------------------------------
 # Request / Response models
 # ---------------------------------------------------------------------------
+
 
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=5000)
@@ -38,8 +41,9 @@ class ChatResponse(BaseModel):
 # Endpoint
 # ---------------------------------------------------------------------------
 
+
 @router.post("", response_model=ChatResponse)
-async def chat(request: ChatRequest) -> ChatResponse:
+async def chat(request: ChatRequest, background_tasks: BackgroundTasks) -> ChatResponse:
     """Send a message and receive a RAG-augmented response."""
     conversation_id = request.conversation_id or str(uuid.uuid4())
     user_id = request.user_id or "anonymous"
@@ -121,7 +125,9 @@ async def chat(request: ChatRequest) -> ChatResponse:
                 rag_score = min(retrieval_docs / 4.0, 1.0)
                 phoenix_label = "good" if rag_score > 0.5 else "needs_improvement"
                 phoenix_score = rag_score
-                phoenix_explanation = f"RAG retrieval: {retrieval_docs}/4 docs, answer: {answer_len} chars"
+                phoenix_explanation = (
+                    f"RAG retrieval: {retrieval_docs}/4 docs, answer: {answer_len} chars"
+                )
             else:
                 phoenix_label = "good" if answer_len > 20 else "needs_improvement"
                 phoenix_score = completeness
@@ -135,17 +141,29 @@ async def chat(request: ChatRequest) -> ChatResponse:
                 explanation=phoenix_explanation,
             )
 
+            # Faithfulness evaluation — background LLM-as-judge (RAG only)
+            if route_type == "rag" and settings.faithfulness_eval_enabled:
+                background_tasks.add_task(
+                    evaluate_faithfulness,
+                    trace_id=trace_id,
+                    question=request.message,
+                    answer=result["answer"],
+                    context=result.get("context", ""),
+                )
+
         return ChatResponse(
             message=result["answer"],
             conversation_id=conversation_id,
             metadata={
                 **result["metrics"],
+                "trace_id": result.get("trace_id"),
                 "route_type": result.get("route_type"),
+                "doc_scores": result.get("doc_scores", []),
                 "source_documents": result["source_documents"],
                 "trace_url": result["trace_url"],
                 "phoenix_url": result["phoenix_url"],
             },
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
     except Exception:
         logger.exception("chat_error | conv=%s", conversation_id)

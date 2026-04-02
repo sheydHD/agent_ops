@@ -15,6 +15,8 @@ export interface MessageMetadata {
   retrieval_docs?: number;
   max_relevance?: number;
   route_type?: string;
+  doc_scores?: number[];
+  trace_id?: string;
   source_documents?: string[];
   trace_url?: string | null;
   phoenix_url?: string | null;
@@ -32,6 +34,12 @@ export interface ChatResponse {
   conversation_id: string;
   metadata: MessageMetadata;
   timestamp: string;
+}
+
+export interface FeedbackRequest {
+  trace_id: string;
+  sentiment: "positive" | "negative";
+  comment?: string;
 }
 
 export interface PromptSummary {

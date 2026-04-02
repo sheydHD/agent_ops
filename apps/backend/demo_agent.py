@@ -19,7 +19,7 @@ from pathlib import Path
 # Ensure src/ is importable
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.config.logging_config import setup_logging  # noqa: E402
+from src.config.logging_config import setup_logging
 
 logger = logging.getLogger("agentops.demo")
 
@@ -29,9 +29,9 @@ async def main() -> None:
 
     setup_logging(level=settings.log_level, log_format=settings.log_format)
 
-    from src.services.telemetry import init_telemetry
-    from src.services.rag_service import ingest_documents, get_collection_count
     from src.agents.rag_agent import ask
+    from src.services.rag_service import get_collection_count, ingest_documents
+    from src.services.telemetry import init_telemetry
 
     logger.info(
         "demo_start | llm=%s base_url=%s embed=%s langfuse=%s phoenix=%s",
@@ -62,7 +62,7 @@ async def main() -> None:
 
     while True:
         try:
-            question = input("You: ").strip()
+            question = input("You: ").strip()  # noqa: ASYNC250
         except (EOFError, KeyboardInterrupt):
             break
 
@@ -77,7 +77,10 @@ async def main() -> None:
         metrics = result["metrics"]
         print(f"  Route:       {result.get('route_type', 'unknown')}")
         print(f"  Latency:     {metrics['latency_ms']:.0f}ms")
-        print(f"  Tokens:      {metrics['input_tokens']} in → {metrics['output_tokens']} out ({metrics['total_tokens']} total)")
+        total = metrics["total_tokens"]
+        tok_in = metrics["input_tokens"]
+        tok_out = metrics["output_tokens"]
+        print(f"  Tokens:      {tok_in} in \u2192 {tok_out} out ({total} total)")
         print(f"  Efficiency:  {metrics['token_efficiency']:.3f}")
         print(f"  Retrieved:   {metrics['retrieval_docs']} docs")
         if result["trace_url"]:

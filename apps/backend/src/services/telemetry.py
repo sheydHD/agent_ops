@@ -44,7 +44,7 @@ class RequestMetrics:
     total_tokens: int = 0
     token_efficiency: float = 0.0  # output / input ratio
     retrieval_docs: int = 0
-    max_relevance: float = 0.0    # orchestrator relevance score
+    max_relevance: float = 0.0  # orchestrator relevance score
 
     def log(self) -> None:
         logger.info(
@@ -75,6 +75,7 @@ class RequestMetrics:
 # Initialization — Shared TracerProvider with dual export
 # ---------------------------------------------------------------------------
 
+
 def init_telemetry() -> None:
     """Initialize dual-export tracing (Langfuse + Phoenix). Call once at startup."""
     global _phoenix_session, _initialized, _tracer
@@ -93,7 +94,7 @@ def init_telemetry() -> None:
         try:
             import phoenix as px
 
-            _phoenix_session = px.launch_app(host="0.0.0.0", port=settings.phoenix_port)
+            _phoenix_session = px.launch_app(host="0.0.0.0", port=settings.phoenix_port)  # noqa: S104
             logger.info("phoenix_init | port=%d", settings.phoenix_port)
 
             from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
@@ -159,6 +160,7 @@ def init_telemetry() -> None:
 # Tracer access
 # ---------------------------------------------------------------------------
 
+
 def get_tracer():
     """Return the OTel tracer (or a no-op tracer if not initialized)."""
     return _tracer or trace.get_tracer("agentops")
@@ -167,6 +169,7 @@ def get_tracer():
 # ---------------------------------------------------------------------------
 # Trace URL helpers
 # ---------------------------------------------------------------------------
+
 
 def get_trace_url(trace_id: str | None = None) -> str | None:
     """Build a Langfuse trace URL for the browser."""
@@ -194,6 +197,7 @@ def get_current_trace_id() -> str | None:
 # ---------------------------------------------------------------------------
 # Langfuse scoring (REST API — no SDK needed)
 # ---------------------------------------------------------------------------
+
 
 def _langfuse_auth_header() -> str:
     """Build Basic auth header for Langfuse public API."""
@@ -287,6 +291,7 @@ async def annotate_phoenix_trace(
 # ---------------------------------------------------------------------------
 # Latency tracking
 # ---------------------------------------------------------------------------
+
 
 class LatencyTracker:
     """Context manager to measure wall-clock latency."""

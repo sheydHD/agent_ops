@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     phoenix_enabled: bool = True
     phoenix_port: int = 6006
 
+    # --- Evaluation ---
+    faithfulness_eval_enabled: bool = True
+
+    # --- Langfuse Datasets ---
+    langfuse_dataset_name: str = "agentops-demo"
+
     # --- Server ---
     log_level: str = "INFO"
     log_format: str = "text"  # "text" for dev, "json" for production

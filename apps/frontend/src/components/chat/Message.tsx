@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import type { Message as MessageType } from "@/types/chat";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { formatLatency } from "@/lib/utils";
+import { submitFeedback } from "@/services/api";
 
 interface MessageProps {
   message: MessageType;
@@ -13,6 +15,18 @@ interface MessageProps {
 export function Message({ message }: MessageProps) {
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
+  const [feedback, setFeedback] = useState<"positive" | "negative" | null>(null);
+
+  async function handleFeedback(sentiment: "positive" | "negative") {
+    const traceId = message.metadata?.trace_id;
+    if (!traceId || feedback !== null) return;
+    setFeedback(sentiment);
+    try {
+      await submitFeedback({ trace_id: traceId, sentiment });
+    } catch {
+      setFeedback(null);
+    }
+  }
 
   return (
     <div
@@ -93,6 +107,46 @@ export function Message({ message }: MessageProps) {
                 </a>
               )}
             </div>
+
+            {/* User feedback — only shown when trace_id is available */}
+            {message.metadata.trace_id && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-xs text-gray-400">Was this helpful?</span>
+                <button
+                  onClick={() => handleFeedback("positive")}
+                  disabled={feedback !== null}
+                  title="Thumbs up"
+                  className={`rounded px-1.5 py-0.5 text-sm transition-colors ${
+                    feedback === "positive"
+                      ? "bg-green-100 text-green-600"
+                      : feedback === null
+                        ? "text-gray-400 hover:bg-green-50 hover:text-green-500"
+                        : "cursor-default text-gray-300"
+                  }`}
+                >
+                  👍
+                </button>
+                <button
+                  onClick={() => handleFeedback("negative")}
+                  disabled={feedback !== null}
+                  title="Thumbs down"
+                  className={`rounded px-1.5 py-0.5 text-sm transition-colors ${
+                    feedback === "negative"
+                      ? "bg-red-100 text-red-600"
+                      : feedback === null
+                        ? "text-gray-400 hover:bg-red-50 hover:text-red-500"
+                        : "cursor-default text-gray-300"
+                  }`}
+                >
+                  👎
+                </button>
+                {feedback && (
+                  <span className="text-xs text-gray-400">
+                    {feedback === "positive" ? "Thanks!" : "Noted."}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

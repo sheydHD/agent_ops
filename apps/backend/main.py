@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
     init_telemetry()
 
     # 2. Auto-ingest documents from data/ directory
-    from src.services.rag_service import ingest_documents, get_collection_count
+    from src.services.rag_service import get_collection_count, ingest_documents
 
     existing = get_collection_count()
     if existing == 0:
@@ -65,7 +65,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.api_title,
     version=settings.api_version,
-    description="AgentOps Demo — RAG pipeline with Langfuse + Phoenix + OTel observability. 100% local.",
+    description=(
+        "AgentOps Demo — RAG pipeline with Langfuse + Phoenix + OTel observability. 100% local."
+    ),
     lifespan=lifespan,
 )
 
@@ -87,10 +89,12 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # --- Routes ----------------------------------------------------------------
 from src.api.routes.chat import router as chat_router
+from src.api.routes.feedback import router as feedback_router
 from src.api.routes.health import router as health_router
 from src.api.routes.prompts import router as prompts_router
 
 app.include_router(chat_router)
+app.include_router(feedback_router)
 app.include_router(health_router)
 app.include_router(prompts_router)
 

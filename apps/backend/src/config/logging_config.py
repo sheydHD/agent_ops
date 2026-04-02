@@ -11,6 +11,7 @@ import logging
 import logging.config
 import sys
 from contextvars import ContextVar
+from datetime import UTC
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -22,8 +23,8 @@ conversation_id_ctx: ContextVar[str] = ContextVar("conversation_id", default="-"
 
 # Expose for use in middleware / route handlers
 __all__ = [
-    "request_id_ctx",
     "conversation_id_ctx",
+    "request_id_ctx",
     "setup_logging",
 ]
 
@@ -67,10 +68,10 @@ class _JsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         import json
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         log_entry: dict[str, Any] = {
-            "ts": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "ts": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "msg": record.getMessage(),
@@ -88,9 +89,7 @@ class _JsonFormatter(logging.Formatter):
 # Public setup function
 # ---------------------------------------------------------------------------
 
-_LOG_FMT_TEXT = (
-    "%(asctime)s | %(levelname)-8s | %(name)-30s | rid=%(request_id)s | %(message)s"
-)
+_LOG_FMT_TEXT = "%(asctime)s | %(levelname)-8s | %(name)-30s | rid=%(request_id)s | %(message)s"
 _LOG_DATEFMT = "%Y-%m-%d %H:%M:%S"
 
 
@@ -126,6 +125,4 @@ def setup_logging(
     for name in _NOISY_LOGGERS:
         logging.getLogger(name).setLevel(logging.WARNING)
 
-    logging.getLogger(__name__).debug(
-        "Logging configured — level=%s, format=%s", level, log_format
-    )
+    logging.getLogger(__name__).debug("Logging configured — level=%s, format=%s", level, log_format)

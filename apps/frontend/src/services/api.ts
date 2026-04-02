@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { ChatRequest, ChatResponse, PromptsListResponse } from "@/types/chat";
+import type { ChatRequest, ChatResponse, FeedbackRequest, PromptsListResponse } from "@/types/chat";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8501";
@@ -25,4 +25,8 @@ export async function checkHealth(): Promise<Record<string, unknown>> {
 export async function fetchPrompts(): Promise<PromptsListResponse> {
   const { data } = await api.get<PromptsListResponse>("/api/prompts");
   return data;
+}
+
+export async function submitFeedback(request: FeedbackRequest): Promise<void> {
+  await api.post("/api/feedback", request);
 }

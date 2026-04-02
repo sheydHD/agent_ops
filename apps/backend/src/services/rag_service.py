@@ -7,9 +7,9 @@ All local: embeddings via Ollama, storage via ChromaDB on disk.
 import logging
 from pathlib import Path
 
+from langchain_chroma import Chroma
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_ollama import OllamaEmbeddings
-from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from src.config.settings import settings
@@ -90,7 +90,11 @@ def ingest_documents(docs_path: str | None = None) -> int:
     for fpath in files:
         try:
             if fpath.stat().st_size > max_file_size:
-                logger.warning("ingest_skip_large | file=%s size=%d", fpath.name, fpath.stat().st_size)
+                logger.warning(
+                    "ingest_skip_large | file=%s size=%d",
+                    fpath.name,
+                    fpath.stat().st_size,
+                )
                 continue
             if fpath.is_symlink():
                 logger.warning("ingest_skip_symlink | file=%s", fpath.name)
@@ -116,7 +120,10 @@ def ingest_documents(docs_path: str | None = None) -> int:
     chunks = splitter.split_documents(all_docs)
     logger.info(
         "ingest_split | documents=%d chunks=%d chunk_size=%d overlap=%d",
-        len(all_docs), len(chunks), settings.chunk_size, settings.chunk_overlap,
+        len(all_docs),
+        len(chunks),
+        settings.chunk_size,
+        settings.chunk_overlap,
     )
 
     # Ingest into ChromaDB

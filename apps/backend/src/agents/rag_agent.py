@@ -16,7 +16,6 @@ Per-request OTel attributes (session_id, user_id, tags) propagate to both backen
 
 import logging
 
-from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from src.agents.orchestrator import RouteType, classify_query
@@ -43,20 +42,25 @@ contain enough information, say so honestly — do not make up facts.
 Context:
 {context}"""
 
-RAG_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", RAG_SYSTEM_PROMPT),
-    ("human", "{input}"),
-])
+RAG_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        ("system", RAG_SYSTEM_PROMPT),
+        ("human", "{input}"),
+    ]
+)
 
-CHAT_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", "You are a helpful assistant. Answer the following question concisely."),
-    ("human", "{input}"),
-])
+CHAT_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        ("system", "You are a helpful assistant. Answer the following question concisely."),
+        ("human", "{input}"),
+    ]
+)
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def _build_prompt(prompt_name: str | None) -> tuple[ChatPromptTemplate, ChatPromptTemplate]:
     """Return (rag_prompt, chat_prompt) — either default or Langfuse-managed."""
@@ -72,20 +76,23 @@ def _build_prompt(prompt_name: str | None) -> tuple[ChatPromptTemplate, ChatProm
 
     # Build a RAG variant that prepends the custom system prompt + context
     custom_rag_system = (
-        custom_text
-        + "\n\nUse the following context to answer the question. "
+        custom_text + "\n\nUse the following context to answer the question. "
         "If the context does not contain enough information, say so honestly "
         "— do not make up facts.\n\nContext:\n{context}"
     )
-    rag_prompt = ChatPromptTemplate.from_messages([
-        ("system", custom_rag_system),
-        ("human", "{input}"),
-    ])
+    rag_prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", custom_rag_system),
+            ("human", "{input}"),
+        ]
+    )
 
-    chat_prompt = ChatPromptTemplate.from_messages([
-        ("system", custom_text),
-        ("human", "{input}"),
-    ])
+    chat_prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", custom_text),
+            ("human", "{input}"),
+        ]
+    )
 
     return rag_prompt, chat_prompt
 
@@ -121,8 +128,11 @@ async def ask(
 
     logger.info(
         "ask_start | mode=%s reason=%s max_relevance=%.3f question_len=%d prompt=%s",
-        mode, decision.reason, decision.max_relevance,
-        len(question), prompt_name or "default",
+        mode,
+        decision.reason,
+        decision.max_relevance,
+        len(question),
+        prompt_name or "default",
     )
 
     rag_prompt, chat_prompt = _build_prompt(prompt_name)
@@ -163,31 +173,31 @@ async def ask(
                 context = "\n\n".join(doc.page_content for doc in docs)
                 source_docs = [doc.page_content[:200] for doc in docs]
 
-                chain = rag_prompt | get_llm() | StrOutputParser()
-                answer = await chain.ainvoke(
+                # Invoke without StrOutputParser so we can read usage_metadata
+                llm_chain = rag_prompt | get_llm()
+                llm_msg = await llm_chain.ainvoke(
                     {"context": context, "input": question},
                 )
+                answer = llm_msg.content
             else:
                 # General path — plain LLM chat via LCEL pipe
                 logger.info("ask_general | reason=%s", decision.reason)
-                chain = chat_prompt | get_llm() | StrOutputParser()
-                answer = await chain.ainvoke(
-                    {"input": question},
-                )
+                llm_chain = chat_prompt | get_llm()
+                llm_msg = await llm_chain.ainvoke({"input": question})
+                answer = llm_msg.content
                 source_docs = []
                 retrieval_count = 0
+                context = ""
 
-        # --- Metrics -------------------------------------------------------
-        # Token counts are word-based estimates; actual token usage is
-        # captured by the OpenInference LangChain instrumentor in the
-        # OTel spans sent to Langfuse/Phoenix.
-        est_input_tokens = len(question.split()) + (retrieval_count * 200)
-        est_output_tokens = len(answer.split())
+        # --- Token counts — real values from LLM response -----------------
+        usage = getattr(llm_msg, "usage_metadata", None) or {}
+        input_tokens = usage.get("input_tokens") or (len(question.split()) + retrieval_count * 200)
+        output_tokens = usage.get("output_tokens") or len(answer.split())
 
         metrics = build_metrics(
             latency_ms=timer.elapsed_ms,
-            input_tokens=est_input_tokens,
-            output_tokens=est_output_tokens,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
             retrieval_docs=retrieval_count,
             max_relevance=decision.max_relevance,
         )
@@ -196,6 +206,11 @@ async def ask(
         span.set_attribute("langfuse.trace.output", answer)
         span.set_attribute("langfuse.trace.metadata.latency_ms", str(round(timer.elapsed_ms)))
         span.set_attribute("langfuse.trace.metadata.retrieval_docs", str(retrieval_count))
+        if decision.doc_scores:
+            span.set_attribute(
+                "langfuse.trace.metadata.doc_scores",
+                ",".join(str(s) for s in decision.doc_scores),
+            )
 
         logger.info(
             "ask_complete | mode=%s latency=%.0fms tokens_in=%d tokens_out=%d "
@@ -222,6 +237,8 @@ async def ask(
     return {
         "answer": answer,
         "source_documents": source_docs,
+        "context": context,
+        "doc_scores": decision.doc_scores,
         "route_type": mode,
         "metrics": metrics.to_dict(),
         "trace_url": trace_url,

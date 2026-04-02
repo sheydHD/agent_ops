@@ -18,7 +18,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import Response
 
-from src.config.logging_config import conversation_id_ctx, request_id_ctx
+from src.config.logging_config import request_id_ctx
 
 logger = logging.getLogger("agentops.middleware")
 
@@ -29,13 +29,14 @@ _QUIET_PATHS = frozenset({"/health", "/docs", "/openapi.json", "/favicon.ico"})
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """Attach a request ID and log every request/response pair."""
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # --- Resolve or generate request ID ---
         raw_rid = request.headers.get("x-request-id") or ""
         # Sanitize: allow only alphanumeric, hyphens, and underscores to prevent log injection
-        rid = raw_rid[:64] if raw_rid and all(c.isalnum() or c in "-_" for c in raw_rid) else uuid.uuid4().hex[:16]
+        if raw_rid and len(raw_rid) <= 64 and all(c.isalnum() or c in "-_" for c in raw_rid):
+            rid = raw_rid
+        else:
+            rid = uuid.uuid4().hex[:16]
         token = request_id_ctx.set(rid)
 
         method = request.method
@@ -94,9 +95,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add standard security headers to every response."""
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"

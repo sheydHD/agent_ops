@@ -40,6 +40,7 @@ class RouteDecision:
 
     route: RouteType
     documents: list[Document] = field(default_factory=list)
+    doc_scores: list[float] = field(default_factory=list)  # per-document relevance
     max_relevance: float = 0.0
     reason: str = ""
 
@@ -62,20 +63,23 @@ def _classify_query_sync(
         return RouteDecision(route=RouteType.GENERAL, reason="no_results")
 
     max_score = max(score for _, score in results)
-    relevant_docs = [doc for doc, score in results if score >= threshold]
+    relevant_pairs = [(doc, score) for doc, score in results if score >= threshold]
 
-    if relevant_docs:
+    if relevant_pairs:
+        rel_docs = [doc for doc, _ in relevant_pairs]
+        rel_scores = [round(score, 4) for _, score in relevant_pairs]
         logger.info(
             "route_decision | route=rag relevant_docs=%d max_score=%.3f threshold=%.3f",
-            len(relevant_docs),
+            len(rel_docs),
             max_score,
             threshold,
         )
         return RouteDecision(
             route=RouteType.RAG,
-            documents=relevant_docs,
+            documents=rel_docs,
+            doc_scores=rel_scores,
             max_relevance=max_score,
-            reason=f"found_{len(relevant_docs)}_relevant_docs",
+            reason=f"found_{len(rel_docs)}_relevant_docs",
         )
 
     logger.info(
@@ -107,5 +111,7 @@ async def classify_query(
 
     Returns a RouteDecision with the chosen route and pre-fetched documents.
     """
-    threshold = relevance_threshold if relevance_threshold is not None else settings.relevance_threshold
+    threshold = (
+        relevance_threshold if relevance_threshold is not None else settings.relevance_threshold
+    )
     return await asyncio.to_thread(_classify_query_sync, question, k, threshold)

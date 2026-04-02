@@ -76,14 +76,15 @@ async def list_prompts() -> list[dict]:
             data = resp.json()
             prompts = data.get("data", [])
 
-            result = []
-            for p in prompts:
-                result.append({
+            result = [
+                {
                     "name": p.get("name", ""),
                     "type": p.get("type", "text"),
                     "labels": p.get("labels", []),
                     "latest_version": p.get("version"),
-                })
+                }
+                for p in prompts
+            ]
 
             logger.info("langfuse_list_prompts | count=%d", len(result))
             return result
