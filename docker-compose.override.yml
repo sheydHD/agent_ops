@@ -1,0 +1,78 @@
+# ============================================================================
+# docker-compose.override.yml - AgentOps Demo: Development Overrides
+# ============================================================================
+# Auto-loaded with `docker compose up` (no -f flag needed)
+# Adds: port mappings, bind mounts, hot-reload, debug logging
+# ============================================================================
+
+services:
+  langfuse-db:
+    container_name: agentops-langfuse-db
+    ports:
+      - "127.0.0.1:5433:5432"
+
+  langfuse-ch:
+    container_name: agentops-clickhouse
+    ports:
+      - "127.0.0.1:8123:8123"
+
+  langfuse-redis:
+    container_name: agentops-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  langfuse-minio:
+    container_name: agentops-minio
+
+  langfuse-worker:
+    container_name: agentops-langfuse-worker
+
+  langfuse:
+    container_name: agentops-langfuse
+    ports:
+      - "127.0.0.1:3100:3000"
+
+  backend:
+    container_name: agentops-backend-dev
+    ports:
+      - "127.0.0.1:8501:8000"
+      - "127.0.0.1:6006:6006"
+    environment:
+      - LOG_LEVEL=DEBUG
+      - WATCHFILES_FORCE_POLLING=1
+      - LANGFUSE_PUBLIC_URL=http://localhost:3100
+    volumes:
+      - ./apps/backend:/app
+      - ./data:/app/data:ro
+      - chroma_data:/app/chroma_data
+    command: ["sh", "/app/start-dev.sh"]
+    restart: unless-stopped
+
+  frontend:
+    container_name: agentops-frontend-dev
+    build:
+      target: dev
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8501
+    ports:
+      - "127.0.0.1:3501:4000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8501
+      - NEXT_PUBLIC_LANGFUSE_URL=http://localhost:3100
+      - NEXT_PUBLIC_PHOENIX_URL=http://localhost:6006
+    volumes:
+      - ./apps/frontend:/app
+      - frontend_node_modules_dev:/app/node_modules
+      - frontend_next_dev:/app/.next
+    command: ["sh", "/app/start-dev.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:4000/', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  frontend_node_modules_dev:
+  frontend_next_dev:

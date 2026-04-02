@@ -1,0 +1,40 @@
+# =============================================================================
+# AgentOps Demo — Python Dependencies (2026 Modern Stack)
+# =============================================================================
+# 100% local stack: Ollama + Langfuse v3 (Docker) + Phoenix (library)
+# =============================================================================
+
+# --- LangChain Core (LCEL-first, no legacy chains) ---
+langchain>=0.3.12
+langchain-ollama>=0.3.0
+langchain-text-splitters>=0.3.0
+
+# --- Vector Store ---
+chromadb>=0.5.0,<0.6.0
+langchain-chroma>=0.2.0,<0.3.0
+
+# --- Document Loaders ---
+langchain-community>=0.3.0
+pypdf>=4.0.0
+
+# --- AgentOps: Observability (Langfuse SDK v4 for v3 server) ---
+langfuse>=4.0.0
+
+# --- AgentOps: Evaluation ---
+arize-phoenix>=8.0.0
+
+# --- AgentOps: OpenTelemetry Bridge ---
+openinference-instrumentation-langchain>=0.1.0
+opentelemetry-api>=1.20.0
+opentelemetry-sdk>=1.20.0
+opentelemetry-exporter-otlp>=1.20.0
+
+# --- API Framework ---
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.9.0
+pydantic-settings>=2.6.0
+
+# --- Utilities ---
+httpx>=0.27.0
+python-multipart>=0.0.9
